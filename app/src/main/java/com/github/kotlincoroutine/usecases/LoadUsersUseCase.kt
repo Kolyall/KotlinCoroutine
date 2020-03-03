@@ -1,10 +1,11 @@
 package com.github.kotlincoroutine.usecases
 
 import com.github.kotlincoroutine.base.UseCase
+import com.github.kotlincoroutine.ext.AndroidDispatchersProvider
 import com.github.kotlincoroutine.usecases.models.User
 import kotlinx.coroutines.delay
 
-class LoadUsersUseCase : UseCase<List<User>>() {
+class LoadUsersUseCase : UseCase<List<User>>(AndroidDispatchersProvider()) {
 
     override suspend fun doOnBackground(): List<User> {
         delay(2000)

@@ -1,10 +1,11 @@
 package com.github.kotlincoroutine.usecases
 
 import com.github.kotlincoroutine.base.UseCase
+import com.github.kotlincoroutine.ext.AndroidDispatchersProvider
 import com.github.kotlincoroutine.usecases.models.Place
 import com.github.kotlincoroutine.usecases.models.User
 
-class LoadPlaceUseCase : UseCase<List<Place>>() {
+class LoadPlaceUseCase : UseCase<List<Place>>(AndroidDispatchersProvider()) {
 
     /*list flatMap to another list example*/
     override suspend fun doOnBackground(): List<Place> {
@@ -18,7 +19,7 @@ class LoadPlaceUseCase : UseCase<List<Place>>() {
     }
 
     private fun getListUser(): List<User> {
-        return mutableListOf(
+        return listOf(
             User("userId1"),
             User("userId2"),
             User("userId3"),

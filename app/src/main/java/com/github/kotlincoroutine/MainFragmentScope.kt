@@ -2,28 +2,26 @@ package com.github.kotlincoroutine
 
 import com.github.kotlincoroutine.api.ApiService
 import com.github.kotlincoroutine.base.BaseFragmentScope
+import com.github.kotlincoroutine.base.doOnError
+import com.github.kotlincoroutine.base.doOnSubscribe
+import com.github.kotlincoroutine.base.doOnSuccess
+import com.github.kotlincoroutine.ext.AndroidDispatchersProvider
+import com.github.kotlincoroutine.ext.onIo
+import com.github.kotlincoroutine.ext.onUi
 import com.github.kotlincoroutine.usecases.LoadPlaceUseCase
 import com.github.kotlincoroutine.usecases.LoadUsersUseCase
-import com.github.kotlincoroutine.usecases.models.User
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.CoroutineContext
 
 class MainFragmentScope : BaseFragmentScope() {
+
+    val TAG: String = "MainFragmentScope"
+
+    val dispatchers = AndroidDispatchersProvider()
 
     private var apiService: ApiService = ApiService()
     private var loadUsersUseCase: LoadUsersUseCase = LoadUsersUseCase()
@@ -31,7 +29,10 @@ class MainFragmentScope : BaseFragmentScope() {
     lateinit var view: MainFragmentView
 
     fun load() {
-//        useCaseRxJavaStyle()
+        useCaseRxJavaStyle()
+//        loadData2 {
+//            Log.e(TAG, "load (line 33): ")
+//        }
 //        launchHandleCatch()
 
 //        flow {
@@ -44,19 +45,18 @@ class MainFragmentScope : BaseFragmentScope() {
 
 //        flowOf(1)
 
-        val userProvider: () -> User = {
-            User("UserId")
-        }
-
-        userProvider
-            .asFlow()
-            .onEach {
-                delay(2000)
-            }
-            .progressOn(view)
-            .launchOnMain(this) {
-                view.showText("Value ${it.id}")
-            }
+//        val userProvider: () -> User = {
+//            User("UserId")
+//        }
+//        userProvider
+//            .asFlow()
+//            .onEach {
+//                delay(2000)
+//            }
+//            .progressOn(view, dispatchers)
+//            .launchOnMain(this, dispatchers) {
+//                view.showText("Value ${it.id}")
+//            }
 
     }
 
@@ -84,12 +84,12 @@ class MainFragmentScope : BaseFragmentScope() {
     private fun useCaseRxJavaStyle() {
         loadPlaceUseCase.setup()
             .doOnSubscribe { showProgress() }
-            .doOnComplete {
-                hideProgress()
+            .doOnSuccess { hideProgress() }
+            .doOnSuccess {
                 view.showText("PlacesList " + it.map { place -> place.id }.reduce { t1, t2 -> "$t1, $t2" })
             }
             .doOnError { hideProgress() }
-            .execute()
+            .execute(dispatchers)
     }
 
     //    async-await
@@ -116,109 +116,33 @@ class MainFragmentScope : BaseFragmentScope() {
     //    withContext
     private fun loadData2(doOnResult: () -> Unit) {
         launch {
-            withContext(Dispatchers.Main) {
-                showProgress()
-                withContext(Dispatchers.IO) {
-                    delay(1000)
+            runCatching {
+                onUi(dispatchers) {
+                    showProgress()
+                }
+                onIo(dispatchers) {
+                    delay(5000)
                     try {
                         view.showText("loadData2")
                     } catch (exception: Exception) {
                         view.showText("Error2")
                     }
                 }
-                hideProgress()
-                withContext(Dispatchers.IO) {
-                    delay(1000)
+                onUi(dispatchers) {
+                    hideProgress()
                 }
-                doOnResult()
-            }
-        }
-    }
-
-    //    withContext-exceptionHandler
-    private fun loadData22(doOnResult: () -> Unit) {
-        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-            view.showText(throwable.message ?: "")
-            hideProgress()
-            launch {
-                withContext(Dispatchers.Main) {
-                    withContext(Dispatchers.IO) {
-                        delay(1000)
-                    }
+                onIo(dispatchers) {
+                    delay(5000)
+                }
+                onUi(dispatchers) {
                     doOnResult()
                 }
-            }
-        }
-        launch(exceptionHandler) {
-            withContext(Dispatchers.Main) {
-                showProgress()
-                withContext(Dispatchers.IO) {
-                    delay(1000)
-                    throw IllegalArgumentException("IllegalArgumentException loadData22")
+            }.onFailure {
+                onUi(dispatchers) {
+                    hideProgress()
+                    view.showText(it.message)
                 }
-                hideProgress()
-                withContext(Dispatchers.IO) {
-                    delay(1000)
-                }
-                doOnResult()
             }
-        }
-    }
-
-    //    dont use launch
-    //    launch
-    private fun loadData3(doOnResult: () -> Unit) {
-        launch {
-            showProgress()
-            delay(1000)
-            try {
-                view.showText("loadData3")
-            } catch (exception: Exception) {
-                view.showText("Error3")
-            }
-            hideProgress()
-            delay(1000)
-            doOnResult()
-        }
-    }
-
-    //    dont use launch
-    //    launch-exceptionHandler
-    private fun loadData4(doOnResult: () -> Unit) {
-        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-            view.showText(throwable.message ?: "")
-            hideProgress()
-            launch {
-                delay(1000)
-                doOnResult()
-            }
-        }
-        launch(exceptionHandler) {
-            showProgress()
-            delay(1000)
-            throw IllegalArgumentException("My IllegalArgumentException")
-            view.showText("loadData4")
-            hideProgress()
-            delay(1000)
-            doOnResult()
-        }
-    }
-
-    private suspend fun doLoadData() {
-        withContext(Dispatchers.Main) {
-            showProgress()
-            withContext(Dispatchers.IO) {
-                apiService.loadTitleData()
-                    .withResult(
-                        doOnSuccess = {
-                            view.showText(it)
-                        },
-                        doOnError = {
-                            view.showText("Error")
-                        }
-                    )
-            }
-            hideProgress()
         }
     }
 
@@ -232,70 +156,3 @@ class MainFragmentScope : BaseFragmentScope() {
     }
 
 }
-
-private fun <T> Flow<T>.progressOn(view: HasProgress): Flow<T> {
-    return onStartAtMain { view.showProgress() }
-        .onCompletionAtMain { view.hideProgress() }
-}
-
-//private fun <T> Flow<T>.launchIn(context: CoroutineContext, function: (List<T>) -> Unit) {
-//    collect { result ->
-//        withContext(context) {
-//            function(result)
-//        }
-//    }
-//}
-
-public fun <T> Flow<T>.launchOn(scope: CoroutineScope, context: CoroutineContext, action: (T) -> Unit): Job {
-    return scope.launch {
-        collect { result ->
-            withContext(context) {
-                action(result)
-            }
-        } // tail-call
-    }
-}
-
-public fun <T> Flow<T>.launchOnMain(scope: CoroutineScope, action: (T) -> Unit): Job {
-    return scope.launch {
-        collect { result ->
-            withContext(Dispatchers.Main) {
-                action(result)
-            }
-        } // tail-call
-    }
-}
-
-fun <T> Flow<T>.onEachAtMain(action: suspend (T) -> Unit): Flow<T> = transform { value ->
-    withContext(Dispatchers.Main) {
-        action(value)
-    }
-    return@transform emit(value)
-}
-
-fun <T> Flow<T>.onEachAt(context: CoroutineContext, action: suspend (T) -> Unit): Flow<T> = transform { value ->
-    withContext(context) {
-        action(value)
-    }
-    return@transform emit(value)
-}
-
-fun <T> Flow<T>.onStartAtMain(
-    action: suspend () -> Unit
-): Flow<T> {
-    return onStart {
-        withContext(Dispatchers.Main) {
-            action()
-        }
-    }
-}
-fun <T> Flow<T>.onCompletionAtMain(
-    action: suspend () -> Unit
-): Flow<T> {
-    return onCompletion {
-        withContext(Dispatchers.Main) {
-            action()
-        }
-    }
-}
-

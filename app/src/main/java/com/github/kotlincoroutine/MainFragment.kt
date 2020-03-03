@@ -42,7 +42,6 @@ class MainFragment : Fragment(), MainFragmentView {
 
     override fun hideProgress() {
         progressBar.visibility = View.GONE
-
     }
 
     override fun showText(result: String?) {
